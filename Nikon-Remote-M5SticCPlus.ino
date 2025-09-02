@@ -1,93 +1,55 @@
-#include <M5StickCPlus.h>
-#include <IRremote.h>
+// Nikon IR Remote emulator
+// Requires: M5Unified library (v0.2.7 or newer), IRremoteESP8266 (v2.8.6)
+// Needs IRrecv.cpp to be deleted from IRremoteESP8266
+#include <M5Unified.h>
+#include <IRremoteESP8266.h>
+#include <IRsend.h>
 
-// Use built-in IR emitter
-IRsend irsend;
+// Internal IR LED on GPIO 9
+constexpr uint16_t kIrLedPin = 9;
+IRsend irsend(kIrLedPin);
 
-// Built-in LED for feedback
-const int ledPin = LED_BUILTIN;
-
-// Timing
-const unsigned long sendInterval = 1000; // interval between IR pulses
-unsigned long lastSendTime = 0;
-unsigned long buttonPressStart = 0;
-
-// Visual feedback
-const unsigned long flashDuration = 150;
-bool circleVisible = false;
-unsigned long circleStartTime = 0;
-
-// Shutter modes
-enum ShutterMode { NONE, HALF_PRESS, FULL_PRESS, CONTINUOUS };
-ShutterMode currentMode = NONE;
-
-// Nikon IR raw data (replace with your verified timings if needed)
-uint16_t nikonIR[] = {1989, 27513, 408, 1569, 386, 3503, 408, 62013, 1985, 27517, 404, 1573, 382, 3506, 405};
-unsigned int nikonIRlen = sizeof(nikonIR) / sizeof(nikonIR[0]);
+// Raw IR data for Nikon "Take Photo"
+uint16_t irData[] = {
+  1989, 27513, 408, 1569, 386, 3503, 408, 62013, 1985, 27517, 404, 1573, 382, 3506, 405
+};
+constexpr uint16_t irDataLen = sizeof(irData) / sizeof(irData[0]);
+constexpr uint16_t kFrequency = 38; // kHz (Nikon standard)
 
 void setup() {
   M5.begin();
-  pinMode(ledPin, OUTPUT);
-  M5.Lcd.begin();
-  M5.Lcd.setTextSize(2);
-  drawText();
+  M5.Display.setRotation(3);
+  M5.Display.fillScreen(BLACK);
+  M5.Display.setTextColor(GREEN, BLACK);
+  M5.Display.setCursor(10, 30);
+  M5.Display.print("Nikon IR Remote");
+  M5.Display.setCursor(10, 70);
+  M5.Display.print("Press Button to shoot");
+
+  irsend.begin(); // Initialize IR sender
 }
 
 void loop() {
   M5.update();
-  unsigned long currentTime = millis();
 
-  // Shutter button
-  if (M5.BtnA.isPressed()) {
-    if (buttonPressStart == 0) buttonPressStart = currentTime;
-    unsigned long pressDuration = currentTime - buttonPressStart;
+  if (M5.BtnA.wasPressed()) {
+    M5.Display.setCursor(10, 110);
+    M5.Display.setTextColor(RED, BLACK);
+    M5.Display.print("Sending IR...");
 
-    // Determine shutter mode
-    if (pressDuration >= 2000) currentMode = CONTINUOUS;
-    else if (pressDuration >= 500) currentMode = FULL_PRESS;
-    else currentMode = HALF_PRESS;
+    // Send Nikon shutter code
+    irsend.sendRaw(irData, irDataLen, kFrequency);
 
-    // Send IR signal based on mode
-    if (currentMode == FULL_PRESS || currentMode == CONTINUOUS) {
-      if (currentTime - lastSendTime >= sendInterval) {
-        lastSendTime = currentTime;
-        sendNikonIR();
-      }
-    } else if (currentMode == HALF_PRESS && lastSendTime == 0) {
-      lastSendTime = currentTime;
-      sendNikonIR();
-    }
+    // Turn off PWM to save battery
+    ledcWrite(0, 0);   // Channel 0, duty 0%
+    ledcDetach(0);     // Detach PWM from IR LED pin
 
-  } else {
-    buttonPressStart = 0;
-    lastSendTime = 0;
-    currentMode = NONE;
-    digitalWrite(ledPin, LOW);
+    delay(200); // Short pause for Nikon camera
+
+    M5.Display.setTextColor(GREEN, BLACK);
+    M5.Display.setCursor(10, 110);
+    M5.Display.print("IR Sent!       ");
   }
 
-  // Handle non-blocking circle feedback
-  if (circleVisible && currentTime - circleStartTime >= flashDuration) {
-    M5.Lcd.fillCircle(100, 100, 50, BLACK);
-    circleVisible = false;
-    drawText();
-    digitalWrite(ledPin, LOW);
-  }
-}
-
-// Send Nikon IR signal
-void sendNikonIR() {
-  irsend.sendRaw(nikonIR, nikonIRlen, 38000); // 38 kHz
-
-  digitalWrite(ledPin, HIGH);
-  M5.Lcd.fillCircle(100, 100, 50, RED);
-  circleStartTime = millis();
-  circleVisible = true;
-}
-
-// Redraw display
-void drawText() {
-  M5.Lcd.setCursor(50, 10);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setTextColor(WHITE, BLACK);
-  M5.Lcd.print("Shutter");
+  delay(20);
 }
