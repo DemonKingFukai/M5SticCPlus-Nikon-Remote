@@ -1,53 +1,93 @@
 #include <M5StickCPlus.h>
 #include <IRremote.h>
 
-// Pin number for the IR LED
-const int irLedPin = 9;
-// Pin number for the LED
-const int ledPin = 10;
-// Create an instance of the IRremote library
+// Use built-in IR emitter
 IRsend irsend;
 
+// Built-in LED for feedback
+const int ledPin = LED_BUILTIN;
+
+// Timing
+const unsigned long sendInterval = 1000; // interval between IR pulses
+unsigned long lastSendTime = 0;
+unsigned long buttonPressStart = 0;
+
+// Visual feedback
+const unsigned long flashDuration = 150;
+bool circleVisible = false;
+unsigned long circleStartTime = 0;
+
+// Shutter modes
+enum ShutterMode { NONE, HALF_PRESS, FULL_PRESS, CONTINUOUS };
+ShutterMode currentMode = NONE;
+
+// Nikon IR raw data (replace with your verified timings if needed)
+uint16_t nikonIR[] = {1989, 27513, 408, 1569, 386, 3503, 408, 62013, 1985, 27517, 404, 1573, 382, 3506, 405};
+unsigned int nikonIRlen = sizeof(nikonIR) / sizeof(nikonIR[0]);
+
 void setup() {
-  // Initialize the LED pin as an output
+  M5.begin();
   pinMode(ledPin, OUTPUT);
-  // Initialize the IR LED pin as an output
-  pinMode(irLedPin, OUTPUT);
-  // Initialize the M5StickC-Plus display
   M5.Lcd.begin();
-  M5.Lcd.setTextSize(2); // set the text size to 2
-  M5.Lcd.setCursor(10, 10); // set the cursor position
-  M5.Lcd.setCursor(50, 10); // set the cursor position for the text
-  M5.Lcd.print("Shutter"); // print the text "Shutter"
+  M5.Lcd.setTextSize(2);
+  drawText();
 }
 
 void loop() {
-  // Check if the button is pressed
-  if (M5.BtnA.read() == 0) {
-    // Turn on the LED
-    digitalWrite(ledPin, HIGH);
-    // Send the IR data when the button is held down
-    if (M5.BtnA.isPressed()) {
-      // IR data
-      uint16_t rawbuf[] = {1989, 27513, 408, 1569, 386, 3503, 408, 62013, 1985, 27517, 404, 1573, 382, 3506, 405};
-      // Frequency of the IR data (in Hz)
-      unsigned int frequency = 38000;
-      // Duty cycle of the IR data (as a fraction of the period)
-      unsigned int rawlen = 33; // duty cycle is a percentage, so multiply by 100
-      // Send the IR data
-      irsend.sendRaw(rawbuf, frequency, rawlen);
-      // Wait 1 second before sending the data again
-      delay(1000);
-      // Draw a circle on the display to indicate that the IR data is being transmitted
-      M5.Lcd.fillCircle(100, 100, 50, RED);
-      // Wait 1 second before clearing the display
-      delay(1000);
-      // Clear the display
-      M5.Lcd.fillScreen(BLACK);
+  M5.update();
+  unsigned long currentTime = millis();
+
+  // Shutter button
+  if (M5.BtnA.isPressed()) {
+    if (buttonPressStart == 0) buttonPressStart = currentTime;
+    unsigned long pressDuration = currentTime - buttonPressStart;
+
+    // Determine shutter mode
+    if (pressDuration >= 2000) currentMode = CONTINUOUS;
+    else if (pressDuration >= 500) currentMode = FULL_PRESS;
+    else currentMode = HALF_PRESS;
+
+    // Send IR signal based on mode
+    if (currentMode == FULL_PRESS || currentMode == CONTINUOUS) {
+      if (currentTime - lastSendTime >= sendInterval) {
+        lastSendTime = currentTime;
+        sendNikonIR();
+      }
+    } else if (currentMode == HALF_PRESS && lastSendTime == 0) {
+      lastSendTime = currentTime;
+      sendNikonIR();
     }
-    // Wait 1 second before turning off the LED
-    delay(1000);
-    // Turn off the LED
+
+  } else {
+    buttonPressStart = 0;
+    lastSendTime = 0;
+    currentMode = NONE;
     digitalWrite(ledPin, LOW);
   }
+
+  // Handle non-blocking circle feedback
+  if (circleVisible && currentTime - circleStartTime >= flashDuration) {
+    M5.Lcd.fillCircle(100, 100, 50, BLACK);
+    circleVisible = false;
+    drawText();
+    digitalWrite(ledPin, LOW);
+  }
+}
+
+// Send Nikon IR signal
+void sendNikonIR() {
+  irsend.sendRaw(nikonIR, nikonIRlen, 38000); // 38 kHz
+
+  digitalWrite(ledPin, HIGH);
+  M5.Lcd.fillCircle(100, 100, 50, RED);
+  circleStartTime = millis();
+  circleVisible = true;
+}
+
+// Redraw display
+void drawText() {
+  M5.Lcd.setCursor(50, 10);
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextColor(WHITE, BLACK);
+  M5.Lcd.print("Shutter");
 }
