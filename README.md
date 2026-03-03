@@ -35,7 +35,7 @@ arduino-cli compile \
 
 ## Release Notes
 
-- `v1.0.0`: current baseline release (no source changes)
+- `v1.0.0`: initial public release
 - `v1.1.0`: UI/UX + functionality improvements
 
 ## License
