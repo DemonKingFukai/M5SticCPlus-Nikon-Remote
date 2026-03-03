@@ -1,41 +1,43 @@
-Nikon IR Remote Emulator for M5StickC Plus
+# Nikon Remote for M5StickC Plus
 
-A compact IR remote emulator for Nikon cameras using the M5StickC Plus. Press the button on your device to trigger the Nikon shutter via the built-in IR LED.
+Compact IR shutter remote for Nikon cameras using the M5StickC Plus internal IR LED.
 
-⸻
+## Highlights
 
-Features
-	•	Sends Nikon “Take Photo” IR command using the M5StickC Plus internal IR LED.
-	•	Simple one-button operation.
-	•	Provides visual feedback on the device’s screen when the signal is sent.
-	•	Power-efficient: disables PWM after sending.
+- Improved on-device UI with live status, mode, battery, and shot counter
+- Three shoot modes:
+  - `Single`
+  - `2s Timer`
+  - `Burst x3`
+- Better Nikon compatibility by sending each shutter trigger twice
+- Simple controls:
+  - `BtnA`: trigger current mode
+  - `BtnB`: cycle mode
 
-⸻
+## Hardware
 
-Requirements
-	•	Hardware:
-	•	M5StickC Plus
-	•	Libraries:
-	•	M5Unified v0.2.7 or newer
-	•	IRremoteESP8266 v2.8.6
+- M5StickC Plus
 
-⚠️ Important: Move or delete IRrecv.cpp from the IRremoteESP8266 library before compiling.
+## Software
 
-⸻
+- Arduino core: `esp32@2.0.17` (tested)
+- Libraries:
+  - `M5Unified@0.2.7`
+  - `IRremoteESP8266@2.8.6`
 
-Setup
-	1.	Install M5Unified and IRremoteESP8266 libraries in Arduino IDE.
-	2.	Remove IRrecv.cpp from the IRremoteESP8266 library folder.
-	3.	Connect your M5StickC Plus and upload the code.
+## Build (arduino-cli example)
 
-⸻
+```bash
+arduino-cli compile \
+  --fqbn esp32:esp32:m5stick-c \
+  ./Nikon-Remote-M5SticCPlus.ino
+```
 
-Usage
-	1.	Power on the M5StickC Plus.
-	2.	The display will show:
- 			Nikon IR Remote
-			Press Button to shoot
-	3.	Press Button A to send the Nikon shutter IR signal.
-	4.	The display updates to indicate:
- 			Sending IR...
-			IR Sent!
+## Release Notes
+
+- `v1.0.0`: current baseline release (no source changes)
+- `v1.1.0`: UI/UX + functionality improvements
+
+## License
+
+MIT License.

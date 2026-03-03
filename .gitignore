@@ -1,0 +1,8 @@
+.tools/
+.arduino-data/
+.arduino-user/
+.arduino-user-m5/
+.arduino-downloads/
+build/
+sketch_v100/
+sketch_v110/
